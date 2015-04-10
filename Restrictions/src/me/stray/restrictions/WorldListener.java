@@ -45,7 +45,7 @@ public class WorldListener implements Listener {
                     if (!event.getPlayer().isOp()) {
                         event.setCancelled(true);
                         event.getPlayer().sendMessage(ChatColor.GRAY + "Potions of Leaping are disabled in this world.");
-                    } 
+                    }
                 }
             }
         }
