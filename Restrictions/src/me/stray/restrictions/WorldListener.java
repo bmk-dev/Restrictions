@@ -45,17 +45,8 @@ public class WorldListener implements Listener {
                     if (!event.getPlayer().isOp()) {
                         event.setCancelled(true);
                         event.getPlayer().sendMessage(ChatColor.GRAY + "Potions of Leaping are disabled in this world.");
-                    } else {
-                        event.setCancelled(false);
-                       // Bukkit.broadcastMessage("Player is not op, passed all other ifs.");
-                    }
+                    } 
                 }
-                else {
-                    //Bukkit.broadcastMessage("Error in world");
-                }
-            }
-            else {
-                //Bukkit.broadcastMessage("Error in Data");
             }
         }
     }
@@ -82,16 +73,8 @@ public class WorldListener implements Listener {
                             }
                         }
                     }
-                } else {
-                    //Bukkit.broadcastMessage("Error in world");
                 }
             }
-            else {
-               // Bukkit.broadcastMessage("Error in getting potion durability");
-            }
-        }
-        else {
-            //Bukkit.broadcastMessage("Error in getting potion item");
         }
     }
 
