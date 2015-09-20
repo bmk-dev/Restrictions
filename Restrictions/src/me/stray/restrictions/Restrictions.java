@@ -32,7 +32,6 @@ public class Restrictions extends JavaPlugin implements Listener {
         registerEvents(this, new BlockBreakListener());
         registerEvents(this, new EntitySpawnListener());
         registerEvents(this, new CommandListener());
-        registerEvents(this, new TabCompleteListener());
         registerEvents(this, this);
         getServer().getPluginManager().registerEvents(this, this);
         getCommand("restrictions").setExecutor(new VersionCommand());
