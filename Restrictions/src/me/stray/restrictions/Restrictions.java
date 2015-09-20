@@ -1,52 +1,61 @@
 package me.stray.restrictions;
 
 import org.bukkit.Bukkit;
-import org.bukkit.World;
-import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
+import com.sk89q.worldguard.bukkit.WorldGuardPlugin;
 
-import java.io.*;
 import java.util.HashMap;
-import java.util.HashSet;
 
 /**
  * Created by Stray on 4/9/2015.
  */
 public class Restrictions extends JavaPlugin implements Listener {
 
-    File locationFile;
-    FileConfiguration locations;
-
+    public static HashMap<Player, ScreenPosition> positions = new HashMap<Player, ScreenPosition>();
+    public static String version = "1.6.3";
     public static Plugin plugin;
+    private static WorldGuardPlugin wg;
 
     @Override
     public void onEnable() {
         plugin = this;
-        registerEvents(this, new WorldListener());
+        registerEvents(this, new PotionListener());
         registerEvents(this, new PistonListener());
+        registerEvents(this, new BlockPlaceListener());
+        registerEvents(this, new ChatListener());
+        registerEvents(this, new BlockBreakListener());
+        registerEvents(this, new EntitySpawnListener());
+        registerEvents(this, new CommandListener());
         registerEvents(this, this);
+        getServer().getPluginManager().registerEvents(this, this);
+        getCommand("restrictions").setExecutor(new VersionCommand());
+        wg = (WorldGuardPlugin) getServer().getPluginManager().getPlugin("WorldGuard");
+        doTick();
+    }
 
-        locationFile = new File(getDataFolder(), "locations.yml");
-        try {
-            firstRun();
-        } catch (Exception e) {
-            e.printStackTrace();
+    private WorldGuardPlugin getWorldGuard() {
+        Plugin plugin = getServer().getPluginManager().getPlugin("WorldGuard");
+        if (plugin == null || !(plugin instanceof WorldGuardPlugin)) {
+            return null;
         }
-        locations = new YamlConfiguration();
-        loadYamls();
+
+        return (WorldGuardPlugin) plugin;
+    }
+
+    public static WorldGuardPlugin getWG() {
+        return wg;
     }
 
 
     @Override
     public void onDisable() {
         plugin = null;
-        saveYamls();
     }
 
     public static void registerEvents(org.bukkit.plugin.Plugin plugin, Listener... listeners) {
@@ -55,93 +64,54 @@ public class Restrictions extends JavaPlugin implements Listener {
         }
     }
 
-    //Following 2 prevent afking. 2 Separate methods because I wanted to.
-    //Uses player pitch/yaw to check whether or not the player is sitting in an afk machine. The chance of a non-afk player being kicked by this is nearly 0, as they would be moving
-    //around, and pitch/yaw are both calculated down to the millionth.
     @EventHandler
-    public void onPlayerMove(PlayerMoveEvent event) {
-        Player p = event.getPlayer();
-        if(!event.getPlayer().isOp()) {
-            long check = System.currentTimeMillis() + (600 * 1000); // (seconds * 1000), 600 seconds is 10 minutes.
-            if(locations.get("locations." + event.getPlayer().getUniqueId().toString()) != null) {
-                if(locations.getDouble("locations." + p.getUniqueId().toString() + ".pitch") != p.getLocation().getPitch()) {
-                    if(locations.getDouble("locations." + p.getUniqueId().toString() + ".yaw") != p.getLocation().getYaw()) {
-                        locations.set("locations." + p.getUniqueId().toString(), null);
-                        locations.set("locations." + p.getUniqueId().toString() + ".afk", check);
-                        locations.set("locations." + p.getUniqueId().toString() + ".pitch", p.getLocation().getPitch());
-                        locations.set("locations." + p.getUniqueId().toString() + ".yaw", p.getLocation().getYaw());
-                        saveYamls();
-                    }
-                }
-            }
-            else {
-                locations.set("locations." + p.getUniqueId().toString() + ".afk", check);
-                locations.set("locations." + p.getUniqueId().toString() + ".yaw", p.getLocation().getYaw());
-                locations.set("locations." + p.getUniqueId().toString() + ".pitch", p.getLocation().getPitch());
-                saveYamls();
-            }
+    public void onPlayerJoin(PlayerJoinEvent event) {
+        if(positions.get(event.getPlayer()) != null) {
+            positions.remove(event.getPlayer());
         }
     }
 
     @EventHandler
-    public void onPlayerMove1(PlayerMoveEvent event) {
-        if(!event.getPlayer().isOp()) {
-            Player p = event.getPlayer();
-            if(locations.get("locations." + p.getUniqueId().toString()) != null) {
-                if(locations.getLong("locations." + p.getUniqueId().toString() + ".afk") <= System.currentTimeMillis()) {
-                    if(locations.getDouble("locations." + p.getUniqueId().toString() + ".pitch") == p.getLocation().getPitch()) {
-                        if(locations.getDouble("locations." + p.getUniqueId().toString() + ".yaw") == p.getLocation().getYaw()) {
-                            Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "kick " + p.getName() + " You have been kicked for idling too long.");
-                            locations.set("locations." + p.getUniqueId().toString(), null);
-                            saveYamls();
+    public void onPlayerLeave(PlayerQuitEvent event) {
+        if(positions.get(event.getPlayer()) != null) {
+            positions.remove(event.getPlayer());
+        }
+    }
+
+    private void doTick() {
+        getServer().getScheduler().scheduleSyncDelayedTask(plugin, new Runnable() {
+            @Override
+            public void run() {
+                for(Player p : Bukkit.getOnlinePlayers()) {
+                    if(!p.hasPermission("restrictions.kick.exempt") && !p.hasPermission("essentials.afk")) {
+                        if (positions.get(p)!=null) {
+                            if (!arePositionsEqual(getScreenPosition(p), positions.get(p))) {
+                                positions.remove(p);
+                                positions.put(p, getScreenPosition(p));
+                            }
+                            else {
+                                p.kickPlayer("You have been kicked for idling too long.");
+                                positions.remove(p);
+                            }
+                        }
+                        else {
+                            positions.put(p, getScreenPosition(p));
                         }
                     }
                 }
+                doTick();
             }
-        }
+        }, 12000L);
     }
 
-    private void copy(InputStream in, File file) {
-        try {
-            OutputStream out = new FileOutputStream(file);
-            byte[] buf = new byte[1024];
-            int len;
-            while((len=in.read(buf))>0){
-                out.write(buf,0,len);
-            }
-            out.close();
-            in.close();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+    public boolean arePositionsEqual(ScreenPosition first, ScreenPosition last) {
+        if(first.Pitch == last.Pitch && first.Yaw == last.Yaw)
+            return true;
+        else
+            return false;
     }
 
-    public void loadYamls() {
-        try {
-            locations.load(locationFile);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+    public ScreenPosition getScreenPosition(Player p) {
+        return new ScreenPosition(p.getLocation().getPitch(), p.getLocation().getYaw());
     }
-
-    public void saveYamls() {
-        try {
-
-            locations.save(locationFile);
-
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void firstRun() throws Exception {
-        if(!locationFile.exists()){
-            locationFile.getParentFile().mkdirs();
-            copy(getResource("locations.yml"), locationFile);
-        }
-
-    }
-
-
-
 }

@@ -1,3 +1,11 @@
 name: Restrictions
 version: 1.0
 main: me.stray.restrictions.Restrictions
+permissions:
+  restrictions.kick.exempt:
+    default: op
+  restrictions.caps.exempt:
+    default: op
+commands:
+  restrictions:
+    description: Displays the current version

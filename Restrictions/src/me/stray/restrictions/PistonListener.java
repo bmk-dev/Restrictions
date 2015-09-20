@@ -1,5 +1,7 @@
 package me.stray.restrictions;
 
+import com.sk89q.worldguard.protection.ApplicableRegionSet;
+import com.sk89q.worldguard.protection.regions.ProtectedRegion;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
@@ -7,6 +9,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockPistonExtendEvent;
 
+import java.util.Iterator;
 import java.util.List;
 
 /**
@@ -14,27 +17,40 @@ import java.util.List;
  */
 public class PistonListener implements Listener {
 
+    //Anti-Farm
     @EventHandler
     public void onPistonMoveBlock(BlockPistonExtendEvent event) {
-
         for(Block block : event.getBlocks()) {
             if(block.getType() == Material.SUGAR_CANE_BLOCK) {
-                String string = event.getBlock().getWorld().getName() + ", " + event.getBlock().getX() + ", " + event.getBlock().getY() + ", " + event.getBlock().getZ();
                 event.setCancelled(true);
-                Restrictions.plugin.getServer().getLogger().info("Prevented piston from breaking SUGAR_CANES at " + string);
             }
             else if(block.getType() == Material.PUMPKIN) {
-                String string = event.getBlock().getWorld().getName() + ", " + event.getBlock().getX() + ", " + event.getBlock().getY() + ", " + event.getBlock().getZ();
                 event.setCancelled(true);
-                Restrictions.plugin.getServer().getLogger().info("Prevented piston from breaking PUMPKIN at " + string);
-            }
-            else if(block.getType() == Material.MELON_BLOCK) {
-                String string = event.getBlock().getWorld().getName() + ", " + event.getBlock().getX() + ", " + event.getBlock().getY() + ", " + event.getBlock().getZ();
-                event.setCancelled(true);
-                Restrictions.plugin.getServer().getLogger().info("Prevented piston from breaking MELON_BLOCK at " + string);
             }
             else {
 
+            }
+        }
+    }
+
+    //Anti flying machine
+    @EventHandler
+    public void onPistonMoveBlock1(BlockPistonExtendEvent event) {
+        for(Block block : event.getBlocks()) {
+            if(block.getType().equals(Material.SLIME_BLOCK)) {
+                ApplicableRegionSet ar = Restrictions.getWG().getRegionManager(event.getBlock().getWorld()).getApplicableRegions(event.getBlock().getLocation());
+                Iterator<ProtectedRegion> prs = ar.iterator();
+                while (prs.hasNext()) {
+                    ProtectedRegion pr = prs.next();
+                    //Requested by SDA so he can use slime blocks in events.
+                    if (!pr.getId().toLowerCase().contains("event")) {
+                        event.setCancelled(true);
+                    }
+                    else {
+                        event.setCancelled(false);
+                        break;
+                    }
+                }
             }
         }
     }
